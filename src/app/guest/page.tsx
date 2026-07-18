@@ -1,11 +1,11 @@
 'use client';
 
+import GiftList from '@/src/components/GiftList';
+import HeroHeader from '@/src/components/HeroHeader';
+import LocationCards from '@/src/components/LocationCards';
+import PixModal from '@/src/components/PixModal';
+import RSVPForm from '@/src/components/RSVPForm';
 import { useState, useEffect } from 'react';
-import HeroHeader from '../components/HeroHeader';
-import LocationCards from '../components/LocationCards';
-import RSVPForm from '../components/RSVPForm';
-import GiftList from '../components/GiftList';
-import PixModal from '../components/PixModal';
 
 
 export default function GuestPage() {
@@ -98,7 +98,7 @@ export default function GuestPage() {
             <LocationCards />
 
             {/* Componente de Formulário RSVP */}
-            <RSVPForm 
+            <RSVPForm
                 rsvpName={rsvpName} setRsvpName={setRsvpName}
                 rsvpPhone={rsvpPhone} setRsvpPhone={setRsvpPhone}
                 rsvpSide={rsvpSide} setRsvpSide={setRsvpSide}
@@ -111,10 +111,10 @@ export default function GuestPage() {
             <GiftList gifts={gifts} onSelectGiftQuota={handleSelectGiftQuota} />
 
             {/* Componente Modal de Pagamento PIX */}
-            <PixModal 
-                isOpen={isPixModalOpen} 
-                onClose={() => setIsPixModalOpen(false)} 
-                selectedGift={selectedGift} 
+            <PixModal
+                isOpen={isPixModalOpen}
+                onClose={() => setIsPixModalOpen(false)}
+                selectedGift={selectedGift}
                 pixKey={process.env.NEXT_PUBLIC_PIX_KEY}
             />
         </div>
