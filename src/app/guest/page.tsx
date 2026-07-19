@@ -133,20 +133,8 @@ export default function GuestPage() {
         setActiveCartSummary(structureSummary);
         localStorage.setItem('casamento_multicotas_cart', JSON.stringify(structureSummary));
 
-        // 1. Atualiza o contador de cotas direto no presente do banco de dados
-        const updatePromises = pendingCartItems.map(item =>
-            fetch('/api/gifts', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    id: item.giftId,
-                    claimedQuotas: item.quantity,
-                    guestName: rsvpName || 'Convidado Concretizado'
-                })
-            })
-        );
-
-        // 2. Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard
+        // Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard.
+        // O próprio backend de /api/orders se encarrega de incrementar e gerenciar as cotas de forma unificada.
         const orderPromises = pendingCartItems.map(item =>
             fetch('/api/orders', {
                 method: 'POST',
@@ -163,14 +151,14 @@ export default function GuestPage() {
             })
         );
 
-        // Executa todas as atualizações de presentes e geração de relatórios históricos em paralelo
-        await Promise.all([...updatePromises, ...orderPromises]);
+        // Executa a criação das ordens de forma segura no banco de dados
+        await Promise.all(orderPromises);
 
         // Fecha a caixa Sim/Não e abre o fluxo final do PIX
         setPendingCartItems(null);
         setIsPixModalOpen(true);
 
-        // Recarrega as cotas atualizadas na tela do usuário
+        // Recarrega as cotas atualizadas na tela do usuário para refletir as alterações processadas pelo back
         fetch('/api/gifts').then(res => res.json()).then(data => setGifts(data));
     };
 
