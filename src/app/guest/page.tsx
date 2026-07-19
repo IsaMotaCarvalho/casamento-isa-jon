@@ -54,13 +54,46 @@ export default function GuestPage() {
 
             fetch(`/api/guests?id=${id}`)
                 .then(res => res.json())
-                .then(data => {
+                .then(async (data) => {
                     if (data && !data.error) {
                         setRsvpName(data.name || '');
                         setRsvpPhone(data.phone || '');
                         setRsvpSide(data.side || 'noivo');
                         setRsvpMessage(data.message || '');
                         if (data.confirmed) setRsvpSuccess(true);
+
+                        // =================================================================
+                        // VALIDAÇÃO ANTI-FANTASMA: Crucial para quando o Convidado é Recriado
+                        // =================================================================
+                        try {
+                            const resOrders = await fetch('/api/orders');
+                            const allOrders = await resOrders.json();
+
+                            // Filtra os pedidos reais que constam no banco para o fone do convidado
+                            const activeOrders = allOrders.filter((o: any) => o.guestPhone === data.phone);
+
+                            if (activeOrders.length === 0) {
+                                // Se no banco de dados não há nenhum pedido, limpamos o cache local do navegador
+                                localStorage.removeItem('casamento_multicotas_cart');
+                                setActiveCartSummary(null);
+                            } else {
+                                // Se há pedidos válidos, remontamos o resumo para garantir sincronia com o banco
+                                const grandTotal = activeOrders.reduce((acc: number, curr: any) => acc + curr.totalValue, 0);
+                                const structuredItems = activeOrders.map((o: any) => ({
+                                    giftId: o.giftId,
+                                    name: o.giftName,
+                                    quantity: o.quantity,
+                                    quotaValue: o.quotaValue,
+                                    totalItemPrice: o.totalValue
+                                }));
+
+                                const structureSummary = { items: structuredItems, totalValue: grandTotal };
+                                setActiveCartSummary(structureSummary);
+                                localStorage.setItem('casamento_multicotas_cart', JSON.stringify(structureSummary));
+                            }
+                        } catch (orderErr) {
+                            console.error('Erro ao validar integridade das cotas com o banco:', orderErr);
+                        }
                     }
                 })
                 .catch(err => console.error('Erro ao buscar dados do convidado:', err))
@@ -113,7 +146,7 @@ export default function GuestPage() {
             })
         );
 
-        // 2. NOVO: Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard
+        // 2. Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard
         const orderPromises = pendingCartItems.map(item =>
             fetch('/api/orders', {
                 method: 'POST',
