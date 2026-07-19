@@ -57,6 +57,36 @@ export default function AdminDashboard() {
         fetchData();
     };
 
+    // NOVA FUNÇÃO: Trata a edição completa do Convidado vinda do Modal
+    const handleUpdateGuest = async (id: string, updatedForm: { name: string; phone: string; side: string; confirmed: boolean }) => {
+        await fetch('/api/guests', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, ...updatedForm }),
+        });
+        fetchData();
+    };
+
+    // NOVA FUNÇÃO: Trata a edição completa do Presente vinda do Modal
+    const handleUpdateGift = async (id: string, updatedForm: { name: string; totalPrice: number; totalQuotas: number }) => {
+        await fetch('/api/gifts', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, ...updatedForm }),
+        });
+        fetchData();
+    };
+
+    // NOVA FUNÇÃO: Altera o status de pagamento de uma cota específica no CRM
+    const handleUpdateOrderStatus = async (orderId: string, giftId: string, newStatus: 'pendente' | 'recebido') => {
+        await fetch('/api/gifts', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: giftId, orderId, status: newStatus, isOrderStatusUpdate: true }),
+        });
+        fetchData();
+    };
+
     const deleteItem = async (route: 'guests' | 'gifts', id: string) => {
         await fetch(`/api/${route}?id=${id}`, { method: 'DELETE' });
         fetchData();
@@ -85,6 +115,7 @@ export default function AdminDashboard() {
                         onAddGuest={handleAddGuest}
                         onToggleConfirm={toggleConfirmGuest}
                         onDeleteItem={deleteItem}
+                        onUpdateGuest={handleUpdateGuest} // Injeção da prop de atualização
                     />
                 )}
 
@@ -93,11 +124,15 @@ export default function AdminDashboard() {
                         gifts={gifts}
                         onAddGift={handleAddGift}
                         onDeleteItem={deleteItem}
+                        onUpdateGift={handleUpdateGift} // Injeção da prop de atualização
                     />
                 )}
 
                 {activeTab === 'orders' && (
-                    <QuotaOrders gifts={gifts} />
+                    <QuotaOrders
+                        gifts={gifts}
+                        onUpdateOrderStatus={handleUpdateOrderStatus} // Injeção do controle de status do CRM
+                    />
                 )}
             </main>
         </div>

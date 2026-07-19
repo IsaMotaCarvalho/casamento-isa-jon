@@ -2,19 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { Gift, QrCode, AlertCircle, CheckCircle, X } from 'lucide-react';
-import HeroHeader from '../components/HeroHeader';
-import LocationCards from '../components/LocationCards';
-import RSVPForm from '../components/RSVPForm';
-import GiftList from '../components/GiftList';
-import PixModal from '../components/PixModal';
+import HeroHeader from '@/src/components/HeroHeader';
+import LocationCards from '@/src/components/LocationCards';
+import RSVPForm from '@/src/components/RSVPForm';
+import GiftList from '@/src/components/GiftList';
+import PixModal from '@/src/components/PixModal';
 
-export default function HomePage() {
+
+export default function GuestPage() {
     const [gifts, setGifts] = useState<any[]>([]);
     const [isPixModalOpen, setIsPixModalOpen] = useState(false);
     const [guestId, setGuestId] = useState<string | null>(null);
-
-    // Chave de reset do carrinho para limpar a barra inferior "Confirmar Opções" após o envio bem-sucedido
-    const [giftListResetKey, setGiftListResetKey] = useState<number>(0);
 
     // Estado que guarda a lista temporária de cotas para exibição no modal de confirmação (Sim/Não)
     const [pendingCartItems, setPendingCartItems] = useState<any[] | null>(null);
@@ -30,21 +28,12 @@ export default function HomePage() {
     const [rsvpSuccess, setRsvpSuccess] = useState(false);
     const [isLoadingGuest, setIsLoadingGuest] = useState(false);
 
-    // Função centralizada para buscar os presentes limpando qualquer cache do navegador
-    const refreshGiftsFromServer = () => {
-        fetch(`/api/gifts?t=${Date.now()}`, { cache: 'no-store' })
-            .then(res => res.json())
-            .then(data => {
-                if (Array.isArray(data)) {
-                    setGifts(data);
-                }
-            })
-            .catch(err => console.error('Erro ao buscar presentes:', err));
-    };
-
     useEffect(() => {
-        // Busca inicial limpa vinda do banco de dados
-        refreshGiftsFromServer();
+        // Busca a lista de presentes atualizada do Banco de Dados
+        fetch('/api/gifts')
+            .then(res => res.json())
+            .then(data => setGifts(data))
+            .catch(err => console.error('Erro ao buscar presentes:', err));
 
         // Recupera o carrinho fixado caso o convidado já tenha gerado o PIX antes
         const savedCart = localStorage.getItem('casamento_multicotas_cart');
@@ -56,7 +45,7 @@ export default function HomePage() {
             }
         }
 
-        // Captura o ID único do link do WhatsApp caso acessem pela rota principal
+        // Captura o ID único do link do WhatsApp
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
 
@@ -97,7 +86,7 @@ export default function HomePage() {
         setRsvpSuccess(true);
     };
 
-    // Estágio 1: Usuário avançou na barra de resumo, abrimos a caixa de Confirmação Direta (Sim/Não)
+    // Estágio 1: Usuário avançou na barra de resumo, abrimos a caixa de Confirmação Directa (Sim/Não)
     const handleReviewSelections = (selectedCart: any[]) => {
         setPendingCartItems(selectedCart);
     };
@@ -112,36 +101,32 @@ export default function HomePage() {
         setActiveCartSummary(structureSummary);
         localStorage.setItem('casamento_multicotas_cart', JSON.stringify(structureSummary));
 
-        // Envia atualizações em paralelo para cada presente escolhido no banco de dados fazendo o $inc real
+        // Envia atualizações em paralelo para cada presente escolhido no banco de dados
         const updatePromises = pendingCartItems.map(item =>
             fetch('/api/gifts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: item.giftId,
-                    claimedQuotas: item.quantity
+                    claimedQuotas: item.quantity, // Altere sua API PUT se preferir somar incrementalmente no backend
+                    guestName: rsvpName || 'Convidado Concretizado'
                 })
             })
         );
 
-        // Aguarda todas as atualizações terminarem de gravar no MongoDB
         await Promise.all(updatePromises);
 
         // Fecha a caixa Sim/Não e abre o fluxo final do PIX
         setPendingCartItems(null);
         setIsPixModalOpen(true);
 
-        // Força o componente GiftList a limpar as seleções inferiores e ocultar a barra de confirmação
-        setGiftListResetKey(prev => prev + 1);
-
-        // Recarrega de forma mandatória as novas quantidades reais salvadas no banco de dados
-        refreshGiftsFromServer();
+        // Recarrega as cotas atualizadas
+        fetch('/api/gifts').then(res => res.json()).then(data => setGifts(data));
     };
 
     const handleClearCart = () => {
         localStorage.removeItem('casamento_multicotas_cart');
         setActiveCartSummary(null);
-        setGiftListResetKey(prev => prev + 1);
     };
 
     return (
@@ -182,14 +167,10 @@ export default function HomePage() {
                 onSubmit={handleRSVP}
             />
 
-            {/* Listagem de Cotas com identificador de reset dinâmico */}
-            <GiftList
-                key={giftListResetKey}
-                gifts={gifts}
-                onReviewSelections={handleReviewSelections}
-            />
+            {/* Listagem de Cotas com a nova Sacola Multi-escolha */}
+            <GiftList gifts={gifts} onReviewSelections={handleReviewSelections} />
 
-            {/* MODAL DE CONFIRMAÇÃO DIRETA (SIM / NÃO) */}
+            {/* MODAL DE CONFIRMAÇÃO DIRETA: "Deseja realmente aquelas cotas? (Sim / Não)" */}
             {pendingCartItems && (
                 <div className="fixed inset-0 bg-stone-950/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
                     <div className="bg-white max-w-md w-full rounded-2xl p-6 shadow-2xl space-y-6 border border-stone-100 animate-in zoom-in-95 duration-200">
@@ -208,6 +189,7 @@ export default function HomePage() {
                                 Você gostaria de confirmar a intenção de presentear os noivos com as seguintes cotas selecionadas?
                             </p>
 
+                            {/* Lista Interna dos Itens Escolhidos */}
                             <div className="bg-stone-50 rounded-xl p-4 border border-stone-200/60 divide-y divide-stone-200/40 max-h-48 overflow-y-auto">
                                 {pendingCartItems.map((item, idx) => (
                                     <div key={item.giftId + idx} className="py-2 flex justify-between text-sm first:pt-0 last:pb-0">
@@ -230,6 +212,7 @@ export default function HomePage() {
                             </div>
                         </div>
 
+                        {/* Botões de Decisão Sim / Não */}
                         <div className="grid grid-cols-2 gap-3">
                             <button
                                 type="button"
@@ -250,10 +233,11 @@ export default function HomePage() {
                 </div>
             )}
 
+            {/* Modal do QR Code Final */}
             <PixModal
                 isOpen={isPixModalOpen}
                 onClose={() => setIsPixModalOpen(false)}
-                cartData={activeCartSummary}
+                cartData={activeCartSummary} // O PixModal agora recebe o objeto completo para calcular a chave dinâmica se necessário
                 pixKey={process.env.NEXT_PUBLIC_PIX_KEY}
             />
         </div>
