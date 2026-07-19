@@ -205,8 +205,16 @@ export default function GuestPage() {
                 onSubmit={handleRSVP}
             />
 
-            {/* Listagem de Cotas com a nova Sacola Multi-escolha */}
-            <GiftList gifts={gifts} onReviewSelections={handleReviewSelections} />
+            {/* 
+              * A propriedade 'key' dinâmica força o GiftList a resetar completamente o seu estado interno
+              * de cotas selecionadas (zerando a sacola) assim que um carrinho se torna ativo ou é limpo.
+              * Isso faz a barra flutuante inferior desaparecer instantaneamente após a confirmação.
+            */}
+            <GiftList
+                key={activeCartSummary ? 'cart-active' : 'cart-empty'}
+                gifts={gifts}
+                onReviewSelections={handleReviewSelections}
+            />
 
             {/* MODAL DE CONFIRMAÇÃO DIRETA: "Deseja realmente aquelas cotas? (Sim / Não)" */}
             {pendingCartItems && (
