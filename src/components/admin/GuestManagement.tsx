@@ -83,9 +83,9 @@ export default function GuestManagement({
                 </button>
             </form>
 
-            {/* Listagem */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            {/* Listagem Corrigida para Rolagem Horizontal */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                         <tr className="bg-slate-100 text-slate-600 text-sm font-semibold">
                             <th className="p-4">Nome</th>

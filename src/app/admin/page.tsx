@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Menu } from 'lucide-react';
 import Sidebar from '../../components/admin/Sidebar';
 import DashboardOverview from '../../components/admin/DashboardOverview';
 import GuestManagement from '../../components/admin/GuestManagement';
@@ -9,6 +10,7 @@ import QuotaOrders from '../../components/admin/QuotaOrders';
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'dash' | 'guests' | 'gifts' | 'orders'>('dash');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [guests, setGuests] = useState<any[]>([]);
     const [gifts, setGifts] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
@@ -80,7 +82,6 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // Atualiza dinamicamente as informações ou quantidades das cotas direto nas modais de edição
     const handleUpdateOrder = async (orderId: string, updatedFields: { quantity?: number; status?: string }) => {
         await fetch('/api/orders', {
             method: 'PUT',
@@ -90,7 +91,6 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // Remove ordens/cotas individuais de dentro das modais de edição
     const handleDeleteOrder = async (orderId: string) => {
         await fetch(`/api/orders?id=${orderId}`, { method: 'DELETE' });
         fetchData();
@@ -113,10 +113,28 @@ export default function AdminDashboard() {
     const totalQuotasMarked = gifts.reduce((acc, curr) => acc + (curr.claimedQuotas || 0), 0);
 
     return (
-        <div className="min-h-screen bg-slate-50 flex">
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+            {/* Topbar do Mobile (Apenas visível em telas menores que md) */}
+            <header className="bg-slate-900 text-white p-4 flex items-center justify-between md:hidden shadow-md z-30">
+                <h2 className="text-lg font-bold tracking-wider text-amber-400">💍 Noivos CRM</h2>
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="text-white hover:text-amber-400 p-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+                >
+                    <Menu size={24} />
+                </button>
+            </header>
 
-            <main className="flex-1 p-10 overflow-y-auto">
+            {/* Menu Lateral Injetado com os Estados do Drawer */}
+            <Sidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                isOpen={isSidebarOpen}
+                setIsOpen={setIsSidebarOpen}
+            />
+
+            {/* Conteúdo Principal com Padding Reativo */}
+            <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
                 {activeTab === 'dash' && (
                     <DashboardOverview
                         guests={guests}
