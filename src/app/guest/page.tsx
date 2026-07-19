@@ -13,6 +13,9 @@ export default function GuestPage() {
     const [isPixModalOpen, setIsPixModalOpen] = useState(false);
     const [guestId, setGuestId] = useState<string | null>(null);
 
+    // Chave numérica que força a re-renderização e limpeza absoluta do GiftList
+    const [giftListKey, setGiftListKey] = useState(0);
+
     // Estado que guarda a lista temporária de cotas para exibição no modal de confirmação (Sim/Não)
     const [pendingCartItems, setPendingCartItems] = useState<any[] | null>(null);
 
@@ -134,7 +137,6 @@ export default function GuestPage() {
         localStorage.setItem('casamento_multicotas_cart', JSON.stringify(structureSummary));
 
         // Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard.
-        // O próprio backend de /api/orders se encarrega de incrementar e gerenciar as cotas de forma unificada.
         const orderPromises = pendingCartItems.map(item =>
             fetch('/api/orders', {
                 method: 'POST',
@@ -154,6 +156,9 @@ export default function GuestPage() {
         // Executa a criação das ordens de forma segura no banco de dados
         await Promise.all(orderPromises);
 
+        // Força a remontagem do componente GiftList zerando a sacola flutuante inferior
+        setGiftListKey(prev => prev + 1);
+
         // Fecha a caixa Sim/Não e abre o fluxo final do PIX
         setPendingCartItems(null);
         setIsPixModalOpen(true);
@@ -165,6 +170,8 @@ export default function GuestPage() {
     const handleClearCart = () => {
         localStorage.removeItem('casamento_multicotas_cart');
         setActiveCartSummary(null);
+        // Reseta o componente de presentes ao limpar o topo também
+        setGiftListKey(prev => prev + 1);
     };
 
     return (
@@ -206,12 +213,12 @@ export default function GuestPage() {
             />
 
             {/* 
-              * A propriedade 'key' dinâmica força o GiftList a resetar completamente o seu estado interno
-              * de cotas selecionadas (zerando a sacola) assim que um carrinho se torna ativo ou é limpo.
-              * Isso faz a barra flutuante inferior desaparecer instantaneamente após a confirmação.
+              * O uso do 'giftListKey' incremental garante que, ao confirmar o presente,
+              * o componente limpe seu estado interno de forma imutável, sumindo com os seletores 
+              * de cotas e a barra preta inferior de revisão.
             */}
             <GiftList
-                key={activeCartSummary ? 'cart-active' : 'cart-empty'}
+                key={giftListKey}
                 gifts={gifts}
                 onReviewSelections={handleReviewSelections}
             />
