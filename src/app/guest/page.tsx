@@ -8,7 +8,6 @@ import RSVPForm from '@/src/components/RSVPForm';
 import GiftList from '@/src/components/GiftList';
 import PixModal from '@/src/components/PixModal';
 
-
 export default function GuestPage() {
     const [gifts, setGifts] = useState<any[]>([]);
     const [isPixModalOpen, setIsPixModalOpen] = useState(false);
@@ -86,12 +85,12 @@ export default function GuestPage() {
         setRsvpSuccess(true);
     };
 
-    // Estágio 1: Usuário avançou na barra de resumo, abrimos a caixa de Confirmação Directa (Sim/Não)
+    // Estágio 1: Usuário avançou na barra de resumo, abrimos a caixa de Confirmação Direta (Sim/Não)
     const handleReviewSelections = (selectedCart: any[]) => {
         setPendingCartItems(selectedCart);
     };
 
-    // Estágio 2: Resposta "SIM, CONFIRMAR" -> Salva no banco e abre a tela de PIX
+    // Estágio 2: Resposta "SIM, CONFIRMAR" -> Salva as cotas, cria os registros de histórico e abre o PIX
     const handleConfirmAllQuotas = async () => {
         if (!pendingCartItems || pendingCartItems.length === 0) return;
 
@@ -101,26 +100,44 @@ export default function GuestPage() {
         setActiveCartSummary(structureSummary);
         localStorage.setItem('casamento_multicotas_cart', JSON.stringify(structureSummary));
 
-        // Envia atualizações em paralelo para cada presente escolhido no banco de dados
+        // 1. Atualiza o contador de cotas direto no presente do banco de dados
         const updatePromises = pendingCartItems.map(item =>
             fetch('/api/gifts', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     id: item.giftId,
-                    claimedQuotas: item.quantity, // Altere sua API PUT se preferir somar incrementalmente no backend
+                    claimedQuotas: item.quantity,
                     guestName: rsvpName || 'Convidado Concretizado'
                 })
             })
         );
 
-        await Promise.all(updatePromises);
+        // 2. NOVO: Cria os registros individuais na tabela de Pedidos/Ordens para o Detalhamento do Dashboard
+        const orderPromises = pendingCartItems.map(item =>
+            fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    guestName: rsvpName || 'Convidado Concretizado',
+                    guestPhone: rsvpPhone || '',
+                    giftId: item.giftId,
+                    giftName: item.name,
+                    quantity: item.quantity,
+                    quotaValue: item.quotaValue,
+                    totalValue: item.totalItemPrice
+                })
+            })
+        );
+
+        // Executa todas as atualizações de presentes e geração de relatórios históricos em paralelo
+        await Promise.all([...updatePromises, ...orderPromises]);
 
         // Fecha a caixa Sim/Não e abre o fluxo final do PIX
         setPendingCartItems(null);
         setIsPixModalOpen(true);
 
-        // Recarrega as cotas atualizadas
+        // Recarrega as cotas atualizadas na tela do usuário
         fetch('/api/gifts').then(res => res.json()).then(data => setGifts(data));
     };
 
@@ -237,7 +254,7 @@ export default function GuestPage() {
             <PixModal
                 isOpen={isPixModalOpen}
                 onClose={() => setIsPixModalOpen(false)}
-                cartData={activeCartSummary} // O PixModal agora recebe o objeto completo para calcular a chave dinâmica se necessário
+                cartData={activeCartSummary}
                 pixKey={process.env.NEXT_PUBLIC_PIX_KEY}
             />
         </div>
