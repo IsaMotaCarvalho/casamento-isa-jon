@@ -1,148 +1,169 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DollarSign, ClipboardList, Filter, Search, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, DollarSign, Search, ClipboardList } from 'lucide-react';
 
 interface QuotaOrdersProps {
-    gifts: any[];
-    onUpdateOrderStatus?: (orderId: string, giftId: string, newStatus: 'pendente' | 'recebido') => Promise<void>;
+    orders: any[];
+    onUpdateOrderStatus: (orderId: string, giftId: string, newStatus: 'pendente' | 'recebido') => void;
 }
 
-export default function QuotaOrders({ gifts, onUpdateOrderStatus }: QuotaOrdersProps) {
-    const [search, setSearch] = useState('');
-    const [filterStatus, setFilterStatus] = useState<'todos' | 'pendente' | 'recebido'>('todos');
+export default function QuotaOrders({ orders, onUpdateOrderStatus }: QuotaOrdersProps) {
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'todos' | 'recebido' | 'pendente'>('todos');
 
-    // Mapeia e estrutura todas as transações para o modelo CRM Pipeline
-    const allOrders = gifts.flatMap(gift => {
-        const quotaPrice = gift.totalPrice / gift.totalQuotas;
-        const reservations = gift.reservations || [];
+    // Cálculos dinâmicos dos cards superiores baseados na lista de pedidos ativa
+    const totalReceived = orders
+        .filter(o => o.status === 'recebido')
+        .reduce((acc, o) => acc + o.totalValue, 0);
 
-        return reservations.map((res: any) => ({
-            id: res._id || Math.random().toString(),
-            giftId: gift._id,
-            guestName: res.guestName || 'Convidado Confirmado',
-            giftName: gift.name,
-            quantity: res.quantity,
-            quotaValue: quotaPrice,
-            totalValue: quotaPrice * res.quantity,
-            status: res.status || 'recebido', // Fallback caso não possua a propriedade estruturada ainda
-            date: res.createdAt ? new Date(res.createdAt).toLocaleDateString('pt-BR') : 'Recente'
-        }));
-    });
+    const totalPending = orders
+        .filter(o => o.status === 'pendente')
+        .reduce((acc, o) => acc + o.totalValue, 0);
 
-    // Filtros dinâmicos de busca e pipeline do CRM
-    const filteredOrders = allOrders.filter(order => {
-        const matchesSearch = order.guestName.toLowerCase().includes(search.toLowerCase()) ||
-            order.giftName.toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = filterStatus === 'todos' || order.status === filterStatus;
+    const totalIntended = totalReceived + totalPending;
+
+    // Regras do funil de filtragem e busca por nome ou presente
+    const filteredOrders = orders.filter(order => {
+        const matchesSearch =
+            (order.guestName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (order.giftName || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesStatus =
+            statusFilter === 'todos' || order.status === statusFilter;
+
         return matchesSearch && matchesStatus;
     });
 
-    const totalRevenue = allOrders.reduce((acc, curr) => acc + curr.totalValue, 0);
-    const totalReceived = allOrders.filter(o => o.status === 'recebido').reduce((acc, curr) => acc + curr.totalValue, 0);
-    const totalPending = allOrders.filter(o => o.status === 'pendente').reduce((acc, curr) => acc + curr.totalValue, 0);
-
-    const toggleStatus = async (order: any) => {
-        if (onUpdateOrderStatus) {
-            const targetStatus = order.status === 'recebido' ? 'pendente' : 'recebido';
-            await onUpdateOrderStatus(order.id, order.giftId, targetStatus);
-        }
-    };
-
     return (
-        <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Pipeline de Cotas Recebidas (CRM)</h1>
+        <div className="space-y-8">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-800">Pipeline de Cotas Recebidas (CRM)</h1>
+            </div>
 
-            {/* Painel Financeiro do CRM */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-center justify-between">
-                    <div>
-                        <span className="text-xs text-emerald-700 font-bold uppercase tracking-wider block">Confirmado / Recebido</span>
-                        <strong className="text-xl font-bold text-emerald-800">R$ {totalReceived.toFixed(2)}</strong>
+            {/* Cards de Métricas Reativas */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-emerald-50/50 border border-emerald-200 p-6 rounded-2xl flex justify-between items-center shadow-sm">
+                    <div className="space-y-1">
+                        <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block">Confirmado / Recebido</span>
+                        <span className="text-2xl font-bold text-emerald-700">R$ {totalReceived.toFixed(2)}</span>
                     </div>
-                    <CheckCircle2 className="text-emerald-600" size={24} />
+                    <CheckCircle className="text-emerald-500 w-6 h-6" />
                 </div>
-                <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center justify-between">
-                    <div>
-                        <span className="text-xs text-amber-700 font-bold uppercase tracking-wider block">Aguardando Verificação</span>
-                        <strong className="text-xl font-bold text-amber-800">R$ {totalPending.toFixed(2)}</strong>
+
+                <div className="bg-amber-50/50 border border-amber-200 p-6 rounded-2xl flex justify-between items-center shadow-sm">
+                    <div className="space-y-1">
+                        <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block">Aguardando Verificação</span>
+                        <span className="text-2xl font-bold text-amber-700">R$ {totalPending.toFixed(2)}</span>
                     </div>
-                    <AlertCircle className="text-amber-600" size={24} />
+                    <AlertCircle className="text-amber-500 w-6 h-6" />
                 </div>
-                <div className="bg-slate-100 border border-slate-200 p-4 rounded-xl flex items-center justify-between">
-                    <div>
-                        <span className="text-xs text-slate-600 font-bold uppercase tracking-wider block">Total Geral Intencionado</span>
-                        <strong className="text-xl font-bold text-slate-800">R$ {totalRevenue.toFixed(2)}</strong>
+
+                <div className="bg-slate-50 border border-slate-200 p-6 rounded-2xl flex justify-between items-center shadow-sm">
+                    <div className="space-y-1">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Total Geral Intencionado</span>
+                        <span className="text-2xl font-bold text-slate-800">R$ {totalIntended.toFixed(2)}</span>
                     </div>
-                    <DollarSign className="text-slate-600" size={24} />
+                    <DollarSign className="text-slate-400 w-6 h-6" />
                 </div>
             </div>
 
-            {/* Controles de Funil e Busca do CRM */}
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 w-full md:max-w-sm">
-                    <Search size={18} className="text-slate-400" />
+            {/* Barra de Filtros e Busca */}
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="relative w-full sm:max-w-md">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                     <input
                         type="text"
                         placeholder="Buscar por convidado ou presente..."
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        className="bg-transparent text-sm text-slate-800 outline-none w-full"
+                        className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-slate-700"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
-                <div className="flex items-center gap-2 text-sm font-medium text-slate-600">
-                    <Filter size={16} />
-                    <span>Filtrar Funil:</span>
-                    <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
-                        <button onClick={() => setFilterStatus('todos')} className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterStatus === 'todos' ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>Todos</button>
-                        <button onClick={() => setFilterStatus('recebido')} className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterStatus === 'recebido' ? 'bg-emerald-600 text-white shadow' : 'text-slate-500 hover:text-slate-800'}`}>Recebidos</button>
-                        <button onClick={() => setFilterStatus('pendente')} className={`px-3 py-1.5 rounded-md font-semibold transition-all ${filterStatus === 'pendente' ? 'bg-amber-500 text-slate-900 shadow' : 'text-slate-500 hover:text-slate-800'}`}>Pendentes</button>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <span className="text-xs font-medium text-slate-500 whitespace-nowrap">Filtrar Funil:</span>
+                    <div className="bg-slate-100 p-1 rounded-xl flex gap-1">
+                        <button
+                            onClick={() => setStatusFilter('todos')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === 'todos' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Todos
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('recebido')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === 'recebido' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Recebidos
+                        </button>
+                        <button
+                            onClick={() => setStatusFilter('pendente')}
+                            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${statusFilter === 'pendente' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Pendentes
+                        </button>
                     </div>
                 </div>
             </div>
 
-            {/* Grid / Tabela CRM */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-                {filteredOrders.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
-                        <ClipboardList size={36} className="text-slate-300" />
-                        <p className="italic text-sm">Nenhum registro de cota encontrado com esses filtros.</p>
+            {/* Lista ou Estado Vazio */}
+            {filteredOrders.length === 0 ? (
+                <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-sm">
+                    <div className="max-w-sm mx-auto space-y-3">
+                        <ClipboardList className="w-12 h-12 text-slate-300 mx-auto" />
+                        <p className="text-sm font-medium text-slate-500">
+                            Nenhum registro de cota encontrado com esses filtros.
+                        </p>
                     </div>
-                ) : (
-                    <table className="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
-                                <th className="p-4">Convidado</th>
-                                <th className="p-4">Presente Escolhido</th>
-                                <th className="p-4 text-center">Quantidade</th>
-                                <th className="p-4">Valor Total</th>
-                                <th className="p-4">Data Registro</th>
-                                <th className="p-4 text-center">Estágio / Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-slate-700">
-                            {filteredOrders.map((order, idx) => (
-                                <tr key={order.id + idx} className="hover:bg-slate-50/60 transition-colors">
-                                    <td className="p-4 font-bold text-slate-800">{order.guestName}</td>
-                                    <td className="p-4 text-slate-600">{order.giftName}</td>
-                                    <td className="p-4 text-center font-bold text-indigo-600">{order.quantity}x</td>
-                                    <td className="p-4 font-extrabold text-slate-900">R$ {order.totalValue.toFixed(2)}</td>
-                                    <td className="p-4 text-xs text-slate-400">{order.date}</td>
-                                    <td className="p-4 text-center">
-                                        <button
-                                            onClick={() => toggleStatus(order)}
-                                            className={`px-3 py-1 rounded-full text-xs font-bold transition-all border ${order.status === 'recebido' ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100' : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'}`}
-                                        >
-                                            {order.status === 'recebido' ? '✓ Pago / Recebido' : '⏰ Pendente'}
-                                        </button>
-                                    </td>
+                </div>
+            ) : (
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                    <th className="p-4">Convidado</th>
+                                    <th className="p-4">Presente / Cota</th>
+                                    <th className="p-4 text-center">Qtd. Cotas</th>
+                                    <th className="p-4">Valor Total</th>
+                                    <th className="p-4">Status</th>
+                                    <th className="p-4 text-center">Ações</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-            </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                                {filteredOrders.map((order) => (
+                                    <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
+                                        <td className="p-4">
+                                            <div className="font-semibold text-slate-900">{order.guestName}</div>
+                                            <div className="text-xs text-slate-400">{order.guestPhone}</div>
+                                        </td>
+                                        <td className="p-4 font-medium text-slate-800">{order.giftName}</td>
+                                        <td className="p-4 text-center font-bold text-slate-600">{order.quantity}</td>
+                                        <td className="p-4 font-semibold text-slate-900">R$ {order.totalValue.toFixed(2)}</td>
+                                        <td className="p-4">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${order.status === 'recebido' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {order.status === 'recebido' ? 'Recebido' : 'Pendente'}
+                                            </span>
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <button
+                                                onClick={() => onUpdateOrderStatus(
+                                                    order._id,
+                                                    order.giftId,
+                                                    order.status === 'recebido' ? 'pendente' : 'recebido'
+                                                )}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${order.status === 'recebido' ? 'bg-white border-amber-200 text-amber-700 hover:bg-amber-50' : 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700 shadow-sm'}`}
+                                            >
+                                                {order.status === 'recebido' ? 'Marcar como Pendente' : 'Aprovar Recebimento'}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

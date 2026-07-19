@@ -1,17 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, Share2, Trash, Edit2, X, Save } from 'lucide-react';
+import { Plus, Share2, Trash, Edit2, X, Save, ShoppingBag } from 'lucide-react';
 
 interface GuestManagementProps {
     guests: any[];
+    orders: any[]; // Adicionado para resolver o erro TS(2322)
     onAddGuest: (guestForm: { name: string; phone: string; side: string }) => Promise<void>;
     onToggleConfirm: (id: string, currentStatus: boolean) => Promise<void>;
     onDeleteItem: (route: 'guests' | 'gifts', id: string) => Promise<void>;
     onUpdateGuest?: (id: string, updatedForm: { name: string; phone: string; side: string; confirmed: boolean }) => Promise<void>;
 }
 
-export default function GuestManagement({ guests, onAddGuest, onToggleConfirm, onDeleteItem, onUpdateGuest }: GuestManagementProps) {
+export default function GuestManagement({ guests, orders, onAddGuest, onToggleConfirm, onDeleteItem, onUpdateGuest }: GuestManagementProps) {
     const [form, setForm] = useState({ name: '', phone: '', side: 'noivo' });
     const [editingGuest, setEditingGuest] = useState<any | null>(null);
 
@@ -77,33 +78,52 @@ export default function GuestManagement({ guests, onAddGuest, onToggleConfirm, o
                             <th className="p-4">Contato</th>
                             <th className="p-4">Vínculo</th>
                             <th className="p-4">Status Presença</th>
+                            <th className="p-4">Cotas Compradas</th> {/* Nova Coluna */}
                             <th className="p-4 text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {guests.map((guest) => (
-                            <tr key={guest._id} className="hover:bg-slate-50">
-                                <td className="p-4 font-medium">{guest.name}</td>
-                                <td className="p-4">{guest.phone}</td>
-                                <td className="p-4 capitalize">{guest.side}</td>
-                                <td className="p-4">
-                                    <button onClick={() => onToggleConfirm(guest._id, guest.confirmed)} className={`px-3 py-1 rounded-full text-xs font-semibold ${guest.confirmed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                        {guest.confirmed ? 'Confirmado' : 'Pendente'}
-                                    </button>
-                                </td>
-                                <td className="p-4 flex items-center justify-center gap-2">
-                                    <button onClick={() => sendWhatsappInvite(guest)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Enviar Link">
-                                        <Share2 size={16} />
-                                    </button>
-                                    <button onClick={() => setEditingGuest({ ...guest })} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar Convidado">
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button onClick={() => onDeleteItem('guests', guest._id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir Convidado">
-                                        <Trash size={16} />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
+                        {guests.map((guest) => {
+                            // Vincula e calcula os dados das cotas deste convidado em tempo real
+                            const guestOrders = (orders || []).filter(o => o.guestPhone === guest.phone);
+                            const totalContributed = guestOrders.reduce((acc, o) => acc + o.totalValue, 0);
+                            const totalItemsCount = guestOrders.reduce((acc, o) => acc + o.quantity, 0);
+
+                            return (
+                                <tr key={guest._id} className="hover:bg-slate-50">
+                                    <td className="p-4 font-medium">{guest.name}</td>
+                                    <td className="p-4">{guest.phone}</td>
+                                    <td className="p-4 capitalize">{guest.side}</td>
+                                    <td className="p-4">
+                                        <button onClick={() => onToggleConfirm(guest._id, guest.confirmed)} className={`px-3 py-1 rounded-full text-xs font-semibold ${guest.confirmed ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                            {guest.confirmed ? 'Confirmado' : 'Pendente'}
+                                        </button>
+                                    </td>
+                                    {/* Célula Dinâmica do Vínculo de Cotas */}
+                                    <td className="p-4">
+                                        {guestOrders.length > 0 ? (
+                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 w-max px-2.5 py-1 rounded-xl">
+                                                <ShoppingBag size={14} className="text-amber-600" />
+                                                <span>{totalItemsCount}x cota(s) (R$ {totalContributed.toFixed(2)})</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-400">—</span>
+                                        )}
+                                    </td>
+                                    <td className="p-4 flex items-center justify-center gap-2">
+                                        <button onClick={() => sendWhatsappInvite(guest)} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="Enviar Link">
+                                            <Share2 size={16} />
+                                        </button>
+                                        <button onClick={() => setEditingGuest({ ...guest })} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar Convidado">
+                                            <Edit2 size={16} />
+                                        </button>
+                                        <button onClick={() => onDeleteItem('guests', guest._id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir Convidado">
+                                            <Trash size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>

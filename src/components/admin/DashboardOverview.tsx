@@ -1,36 +1,33 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, CheckCircle, Clock, Gift, MessageSquare, X, Search, DollarSign } from 'lucide-react';
+import { Users, CheckCircle, Clock, Gift, MessageSquare, X, Search } from 'lucide-react';
 
 interface DashboardOverviewProps {
     guests: any[];
     gifts: any[];
+    orders: any[]; // Adicionado para resolver o erro TS(2322)
     totalQuotasMarked: number;
 }
 
 type DetailView = 'total' | 'confirmed' | 'pending' | 'quotas' | null;
 
-export default function DashboardOverview({ guests, gifts, totalQuotasMarked }: DashboardOverviewProps) {
+export default function DashboardOverview({ guests, gifts, orders, totalQuotasMarked }: DashboardOverviewProps) {
     const [view, setView] = useState<DetailView>(null);
     const [searchTerm, setSearchTerm] = useState('');
 
     const confirmedGuests = guests.filter(g => g.confirmed);
     const pendingGuests = guests.filter(g => !g.confirmed);
 
-    // Une as reservas de todas as cotas para o detalhamento
-    const allQuotasDetails = gifts.flatMap(gift => {
-        const quotaPrice = gift.totalPrice / gift.totalQuotas;
-        const reservations = gift.reservations || [];
-        return reservations.map((res: any) => ({
-            guestName: res.guestName || 'Convidado Confirmado',
-            giftName: gift.name,
-            quantity: res.quantity,
-            quotaValue: quotaPrice,
-            totalValue: quotaPrice * res.quantity,
-            date: res.createdAt ? new Date(res.createdAt).toLocaleDateString('pt-BR') : 'Recente'
-        }));
-    });
+    // Une as reservas utilizando diretamente a nova coleção centralizada de pedidos
+    const allQuotasDetails = (orders || []).map((order: any) => ({
+        guestName: order.guestName || 'Convidado Confirmado',
+        giftName: order.giftName,
+        quantity: order.quantity,
+        quotaValue: order.quotaValue || (order.totalValue / order.quantity),
+        totalValue: order.totalValue,
+        date: order.createdAt ? new Date(order.createdAt).toLocaleDateString('pt-BR') : 'Recente'
+    }));
 
     const filteredGuests = guests.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()));
     const filteredConfirmed = confirmedGuests.filter(g => g.name.toLowerCase().includes(searchTerm.toLowerCase()));

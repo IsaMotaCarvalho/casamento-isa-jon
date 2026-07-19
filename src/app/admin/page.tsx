@@ -11,6 +11,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'dash' | 'guests' | 'gifts' | 'orders'>('dash');
     const [guests, setGuests] = useState<any[]>([]);
     const [gifts, setGifts] = useState<any[]>([]);
+    const [orders, setOrders] = useState<any[]>([]); // Estado centralizado de controle de cotas
 
     useEffect(() => {
         fetchData();
@@ -25,6 +26,10 @@ export default function AdminDashboard() {
             const resGifts = await fetch('/api/gifts');
             const dataGifts = await resGifts.json();
             setGifts(dataGifts);
+
+            const resOrders = await fetch('/api/orders');
+            const dataOrders = await resOrders.json();
+            setOrders(dataOrders);
         } catch (err) {
             console.error('Erro ao buscar informações do banco:', err);
         }
@@ -57,7 +62,6 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // NOVA FUNÇÃO: Trata a edição completa do Convidado vinda do Modal
     const handleUpdateGuest = async (id: string, updatedForm: { name: string; phone: string; side: string; confirmed: boolean }) => {
         await fetch('/api/guests', {
             method: 'PUT',
@@ -67,7 +71,6 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // NOVA FUNÇÃO: Trata a edição completa do Presente vinda do Modal
     const handleUpdateGift = async (id: string, updatedForm: { name: string; totalPrice: number; totalQuotas: number }) => {
         await fetch('/api/gifts', {
             method: 'PUT',
@@ -77,12 +80,12 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // NOVA FUNÇÃO: Altera o status de pagamento de uma cota específica no CRM
+    // Atualiza o status diretamente na API limpa de pedidos
     const handleUpdateOrderStatus = async (orderId: string, giftId: string, newStatus: 'pendente' | 'recebido') => {
-        await fetch('/api/gifts', {
+        await fetch('/api/orders', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: giftId, orderId, status: newStatus, isOrderStatusUpdate: true }),
+            body: JSON.stringify({ id: orderId, status: newStatus }),
         });
         fetchData();
     };
@@ -105,6 +108,7 @@ export default function AdminDashboard() {
                     <DashboardOverview
                         guests={guests}
                         gifts={gifts}
+                        orders={orders}
                         totalQuotasMarked={totalQuotasMarked}
                     />
                 )}
@@ -112,10 +116,11 @@ export default function AdminDashboard() {
                 {activeTab === 'guests' && (
                     <GuestManagement
                         guests={guests}
+                        orders={orders} // Injeção de Pedidos para permitir o vínculo visual na tabela de convidados
                         onAddGuest={handleAddGuest}
                         onToggleConfirm={toggleConfirmGuest}
                         onDeleteItem={deleteItem}
-                        onUpdateGuest={handleUpdateGuest} // Injeção da prop de atualização
+                        onUpdateGuest={handleUpdateGuest}
                     />
                 )}
 
@@ -124,14 +129,14 @@ export default function AdminDashboard() {
                         gifts={gifts}
                         onAddGift={handleAddGift}
                         onDeleteItem={deleteItem}
-                        onUpdateGift={handleUpdateGift} // Injeção da prop de atualização
+                        onUpdateGift={handleUpdateGift}
                     />
                 )}
 
                 {activeTab === 'orders' && (
                     <QuotaOrders
-                        gifts={gifts}
-                        onUpdateOrderStatus={handleUpdateOrderStatus} // Injeção do controle de status do CRM
+                        orders={orders} // Passa os pedidos reais ao invés do mapeamento antigo
+                        onUpdateOrderStatus={handleUpdateOrderStatus}
                     />
                 )}
             </main>
