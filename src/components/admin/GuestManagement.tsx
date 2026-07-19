@@ -5,14 +5,25 @@ import { Plus, Share2, Trash, Edit2, X, Save, ShoppingBag } from 'lucide-react';
 
 interface GuestManagementProps {
     guests: any[];
-    orders: any[]; // Adicionado para resolver o erro TS(2322)
+    orders: any[];
     onAddGuest: (guestForm: { name: string; phone: string; side: string }) => Promise<void>;
     onToggleConfirm: (id: string, currentStatus: boolean) => Promise<void>;
     onDeleteItem: (route: 'guests' | 'gifts', id: string) => Promise<void>;
     onUpdateGuest?: (id: string, updatedForm: { name: string; phone: string; side: string; confirmed: boolean }) => Promise<void>;
+    onUpdateOrder?: (orderId: string, updatedFields: { quantity?: number; status?: string }) => Promise<void>;
+    onDeleteOrder?: (orderId: string) => Promise<void>;
 }
 
-export default function GuestManagement({ guests, orders, onAddGuest, onToggleConfirm, onDeleteItem, onUpdateGuest }: GuestManagementProps) {
+export default function GuestManagement({
+    guests,
+    orders,
+    onAddGuest,
+    onToggleConfirm,
+    onDeleteItem,
+    onUpdateGuest,
+    onUpdateOrder,
+    onDeleteOrder
+}: GuestManagementProps) {
     const [form, setForm] = useState({ name: '', phone: '', side: 'noivo' });
     const [editingGuest, setEditingGuest] = useState<any | null>(null);
 
@@ -42,6 +53,9 @@ export default function GuestManagement({ guests, orders, onAddGuest, onToggleCo
         const formattedPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
         window.open(`https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`, '_blank');
     };
+
+    // Filtra ordens do convidado atualmente aberto na modal de edição
+    const editingGuestOrders = editingGuest ? (orders || []).filter(o => o.guestPhone === editingGuest.phone) : [];
 
     return (
         <div className="space-y-6">
@@ -78,13 +92,12 @@ export default function GuestManagement({ guests, orders, onAddGuest, onToggleCo
                             <th className="p-4">Contato</th>
                             <th className="p-4">Vínculo</th>
                             <th className="p-4">Status Presença</th>
-                            <th className="p-4">Cotas Compradas</th> {/* Nova Coluna */}
+                            <th className="p-4">Cotas Compradas</th>
                             <th className="p-4 text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-700">
                         {guests.map((guest) => {
-                            // Vincula e calcula os dados das cotas deste convidado em tempo real
                             const guestOrders = (orders || []).filter(o => o.guestPhone === guest.phone);
                             const totalContributed = guestOrders.reduce((acc, o) => acc + o.totalValue, 0);
                             const totalItemsCount = guestOrders.reduce((acc, o) => acc + o.quantity, 0);
@@ -99,7 +112,6 @@ export default function GuestManagement({ guests, orders, onAddGuest, onToggleCo
                                             {guest.confirmed ? 'Confirmado' : 'Pendente'}
                                         </button>
                                     </td>
-                                    {/* Célula Dinâmica do Vínculo de Cotas */}
                                     <td className="p-4">
                                         {guestOrders.length > 0 ? (
                                             <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 w-max px-2.5 py-1 rounded-xl">
@@ -163,6 +175,43 @@ export default function GuestManagement({ guests, orders, onAddGuest, onToggleCo
                                     </select>
                                 </div>
                             </div>
+
+                            {/* SEÇÃO DINÂMICA: EDITAR COTAS DO CONVIDADO */}
+                            <div className="border-t border-slate-100 pt-3 mt-3">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cotas Reservadas por Ele</label>
+                                {editingGuestOrders.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic">Nenhum presente escolhido por este convidado.</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {editingGuestOrders.map((order) => (
+                                            <div key={order._id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                                                <div className="flex-1 min-w-0 pr-2">
+                                                    <p className="font-semibold text-slate-800 truncate">{order.giftName}</p>
+                                                    <p className="text-slate-500">Total: R$ {order.totalValue.toFixed(2)} ({order.status})</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={order.quantity}
+                                                        onChange={(e) => onUpdateOrder && onUpdateOrder(order._id, { quantity: Number(e.target.value) })}
+                                                        className="w-12 px-1 py-0.5 border border-slate-300 rounded text-center font-bold text-slate-800 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onDeleteOrder && onDeleteOrder(order._id)}
+                                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                                        title="Remover esta cota"
+                                                    >
+                                                        <Trash size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                                 <button type="button" onClick={() => setEditingGuest(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                                 <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg flex items-center gap-1.5"><Save size={16} /> Salvar Alterações</button>

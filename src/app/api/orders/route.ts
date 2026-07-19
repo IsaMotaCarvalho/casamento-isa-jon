@@ -21,7 +21,6 @@ export async function POST(request: Request) {
         const data = await request.json();
         const order = await Order.create(data);
 
-        // Atualiza as cotas ocupadas no respectivo presente de forma automática
         await Gift.findByIdAndUpdate(data.giftId, {
             $inc: { claimedQuotas: Number(data.quantity) }
         });
@@ -36,13 +35,43 @@ export async function PUT(request: Request) {
     await dbConnect();
     try {
         const data = await request.json();
-        const { id, status } = data;
+        const { id, status, quantity } = data;
 
-        const order = await Order.findByIdAndUpdate(id, { status }, { new: true });
-        if (!order) {
+        const oldOrder = await Order.findById(id);
+        if (!oldOrder) {
             return NextResponse.json({ error: 'Pedido não encontrado' }, { status: 404 });
         }
 
+        const updateFields: any = {};
+        if (status !== undefined) updateFields.status = status;
+
+        // Se houver alteração manual na quantidade de cotas
+        if (quantity !== undefined) {
+            const newQty = Number(quantity);
+            if (newQty !== oldOrder.quantity) {
+                const diff = newQty - oldOrder.quantity;
+                updateFields.quantity = newQty;
+                updateFields.totalValue = newQty * oldOrder.quotaValue;
+
+                // Atualiza o contador absoluto de cotas compradas do presente
+                await Gift.findByIdAndUpdate(oldOrder.giftId, {
+                    $inc: { claimedQuotas: diff }
+                });
+
+                // Sincroniza o array interno de reservas do presente correspondente
+                await Gift.findOneAndUpdate(
+                    { _id: oldOrder.giftId, "reservations.guestPhone": oldOrder.guestPhone },
+                    {
+                        $set: {
+                            "reservations.$.quantity": newQty,
+                            "reservations.$.totalValue": newQty * oldOrder.quotaValue
+                        }
+                    }
+                );
+            }
+        }
+
+        const order = await Order.findByIdAndUpdate(id, updateFields, { new: true });
         return NextResponse.json(order);
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 400 });
@@ -57,14 +86,15 @@ export async function DELETE(request: Request) {
 
         const order = await Order.findById(id);
         if (order) {
-            // Estorna a quantidade de cotas liberadas no presente
+            // Estorna as cotas e remove do histórico embarcado do presente
             await Gift.findByIdAndUpdate(order.giftId, {
-                $inc: { claimedQuotas: -Number(order.quantity) }
+                $inc: { claimedQuotas: -Number(order.quantity) },
+                $pull: { reservations: { guestPhone: order.guestPhone } }
             });
             await Order.findByIdAndDelete(id);
         }
 
-        return NextResponse.json({ message: 'Pedido removido com sucesso' });
+        return NextResponse.json({ message: 'Pedido removido com sucesso e cotas recalculadas.' });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 400 });
     }

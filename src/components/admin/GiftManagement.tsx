@@ -5,12 +5,23 @@ import { Plus, Trash, Edit2, X, Save } from 'lucide-react';
 
 interface GiftManagementProps {
     gifts: any[];
+    orders: any[];
     onAddGift: (giftForm: { name: string; totalPrice: number; totalQuotas: number }) => Promise<void>;
     onDeleteItem: (route: 'gifts' | 'guests', id: string) => Promise<void>;
     onUpdateGift?: (id: string, updatedForm: { name: string; totalPrice: number; totalQuotas: number }) => Promise<void>;
+    onUpdateOrder?: (orderId: string, updatedFields: { quantity?: number; status?: string }) => Promise<void>;
+    onDeleteOrder?: (orderId: string) => Promise<void>;
 }
 
-export default function GiftManagement({ gifts, onAddGift, onDeleteItem, onUpdateGift }: GiftManagementProps) {
+export default function GiftManagement({
+    gifts,
+    orders,
+    onAddGift,
+    onDeleteItem,
+    onUpdateGift,
+    onUpdateOrder,
+    onDeleteOrder
+}: GiftManagementProps) {
     const [form, setForm] = useState({ name: '', totalPrice: 0, totalQuotas: 1 });
     const [editingGift, setEditingGift] = useState<any | null>(null);
 
@@ -31,6 +42,9 @@ export default function GiftManagement({ gifts, onAddGift, onDeleteItem, onUpdat
             setEditingGift(null);
         }
     };
+
+    // Filtra ordens pertencentes ao item que está sendo editado na modal
+    const editingGiftOrders = editingGift ? (orders || []).filter(o => o.giftId === editingGift._id) : [];
 
     return (
         <div className="space-y-6">
@@ -115,6 +129,43 @@ export default function GiftManagement({ gifts, onAddGift, onDeleteItem, onUpdat
                                     <input type="number" required min={editingGift.claimedQuotas || 1} value={editingGift.totalQuotas} onChange={e => setEditingGift({ ...editingGift, totalQuotas: Number(e.target.value) })} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800" />
                                 </div>
                             </div>
+
+                            {/* SEÇÃO DINÂMICA: LISTAR E EDITAR SELEÇÕES DE CONVIDADOS NESSA COTA */}
+                            <div className="border-t border-slate-100 pt-3 mt-3">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Reservas Ativas deste Item</label>
+                                {editingGiftOrders.length === 0 ? (
+                                    <p className="text-xs text-slate-400 italic">Nenhum convidado reservou este item ainda.</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {editingGiftOrders.map((order) => (
+                                            <div key={order._id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                                                <div className="flex-1 min-w-0 pr-2">
+                                                    <p className="font-semibold text-slate-800 truncate">{order.guestName}</p>
+                                                    <p className="text-slate-500">{order.guestPhone} • {order.quantity}x</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={order.quantity}
+                                                        onChange={(e) => onUpdateOrder && onUpdateOrder(order._id, { quantity: Number(e.target.value) })}
+                                                        className="w-12 px-1 py-0.5 border border-slate-300 rounded text-center font-bold text-slate-800 bg-white"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onDeleteOrder && onDeleteOrder(order._id)}
+                                                        className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                                                        title="Remover reserva"
+                                                    >
+                                                        <Trash size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
                                 <button type="button" onClick={() => setEditingGift(null)} className="px-4 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 hover:bg-slate-50">Cancelar</button>
                                 <button type="submit" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-lg flex items-center gap-1.5"><Save size={16} /> Salvar Presente</button>

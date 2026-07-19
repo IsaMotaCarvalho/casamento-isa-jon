@@ -11,7 +11,7 @@ export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'dash' | 'guests' | 'gifts' | 'orders'>('dash');
     const [guests, setGuests] = useState<any[]>([]);
     const [gifts, setGifts] = useState<any[]>([]);
-    const [orders, setOrders] = useState<any[]>([]); // Estado centralizado de controle de cotas
+    const [orders, setOrders] = useState<any[]>([]);
 
     useEffect(() => {
         fetchData();
@@ -80,7 +80,22 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    // Atualiza o status diretamente na API limpa de pedidos
+    // Atualiza dinamicamente as informações ou quantidades das cotas direto nas modais de edição
+    const handleUpdateOrder = async (orderId: string, updatedFields: { quantity?: number; status?: string }) => {
+        await fetch('/api/orders', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: orderId, ...updatedFields }),
+        });
+        fetchData();
+    };
+
+    // Remove ordens/cotas individuais de dentro das modais de edição
+    const handleDeleteOrder = async (orderId: string) => {
+        await fetch(`/api/orders?id=${orderId}`, { method: 'DELETE' });
+        fetchData();
+    };
+
     const handleUpdateOrderStatus = async (orderId: string, giftId: string, newStatus: 'pendente' | 'recebido') => {
         await fetch('/api/orders', {
             method: 'PUT',
@@ -99,10 +114,8 @@ export default function AdminDashboard() {
 
     return (
         <div className="min-h-screen bg-slate-50 flex">
-            {/* Sidebar de navegação modular */}
             <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            {/* Renderização condicional do conteúdo principal */}
             <main className="flex-1 p-10 overflow-y-auto">
                 {activeTab === 'dash' && (
                     <DashboardOverview
@@ -116,26 +129,31 @@ export default function AdminDashboard() {
                 {activeTab === 'guests' && (
                     <GuestManagement
                         guests={guests}
-                        orders={orders} // Injeção de Pedidos para permitir o vínculo visual na tabela de convidados
+                        orders={orders}
                         onAddGuest={handleAddGuest}
                         onToggleConfirm={toggleConfirmGuest}
                         onDeleteItem={deleteItem}
                         onUpdateGuest={handleUpdateGuest}
+                        onUpdateOrder={handleUpdateOrder}
+                        onDeleteOrder={handleDeleteOrder}
                     />
                 )}
 
                 {activeTab === 'gifts' && (
                     <GiftManagement
                         gifts={gifts}
+                        orders={orders}
                         onAddGift={handleAddGift}
                         onDeleteItem={deleteItem}
                         onUpdateGift={handleUpdateGift}
+                        onUpdateOrder={handleUpdateOrder}
+                        onDeleteOrder={handleDeleteOrder}
                     />
                 )}
 
                 {activeTab === 'orders' && (
                     <QuotaOrders
-                        orders={orders} // Passa os pedidos reais ao invés do mapeamento antigo
+                        orders={orders}
                         onUpdateOrderStatus={handleUpdateOrderStatus}
                     />
                 )}

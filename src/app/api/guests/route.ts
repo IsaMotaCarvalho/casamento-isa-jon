@@ -1,17 +1,17 @@
 import dbConnect from '@/src/lib/mongodb';
 import Guest from '@/src/models/Guest';
+import Order from '@/src/models/Order';
+import Gift from '@/src/models/Gift';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
     await dbConnect();
 
-    // Captura os parâmetros da URL (ex: /api/guests?id=65f1a2b3...)
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
     try {
         if (id) {
-            // Se houver ID, busca e retorna apenas este convidado específico
             const guest = await Guest.findById(id);
             if (!guest) {
                 return NextResponse.json({ error: 'Convidado não encontrado' }, { status: 404 });
@@ -19,7 +19,6 @@ export async function GET(request: Request) {
             return NextResponse.json(guest);
         }
 
-        // Se não houver ID, retorna a lista completa (usado no painel Admin)
         const guests = await Guest.find({});
         return NextResponse.json(guests);
     } catch (error) {
@@ -34,7 +33,6 @@ export async function POST(request: Request) {
 
     try {
         if (id) {
-            // Se o ID foi enviado, o convidado já existe e está apenas confirmando presença (RSVP)
             const guest = await Guest.findByIdAndUpdate(id, updateData, { new: true });
             if (!guest) {
                 return NextResponse.json({ error: 'Convidado não encontrado para atualização' }, { status: 404 });
@@ -42,7 +40,6 @@ export async function POST(request: Request) {
             return NextResponse.json(guest);
         }
 
-        // Se não houver ID no corpo, é uma criação de um novo convidado (usado no painel Admin)
         const guest = await Guest.create(data);
         return NextResponse.json(guest, { status: 201 });
     } catch (error) {
@@ -71,9 +68,28 @@ export async function DELETE(request: Request) {
     const id = searchParams.get('id');
 
     try {
+        const guest = await Guest.findById(id);
+        if (!guest) {
+            return NextResponse.json({ error: 'Convidado não encontrado' }, { status: 404 });
+        }
+
+        // 1. Busca todos os pedidos associados ao telefone deste convidado
+        const guestOrders = await Order.find({ guestPhone: guest.phone });
+
+        // 2. Desfaz as operações de quantidades e limpa os históricos em todas as tabelas
+        for (const order of guestOrders) {
+            await Gift.findByIdAndUpdate(order.giftId, {
+                $inc: { claimedQuotas: -Number(order.quantity) },
+                $pull: { reservations: { guestPhone: guest.phone } }
+            });
+        }
+
+        // 3. Remove os pedidos e o convidado definitivamente
+        await Order.deleteMany({ guestPhone: guest.phone });
         await Guest.findByIdAndDelete(id);
-        return NextResponse.json({ message: 'Convidado removido' });
+
+        return NextResponse.json({ message: 'Convidado e todas as suas cotas correspondentes foram removidos com sucesso!' });
     } catch (error) {
-        return NextResponse.json({ error: 'Erro ao remover convidado' }, { status: 400 });
+        return NextResponse.json({ error: 'Erro ao processar a remoção em cascata do convidado' }, { status: 400 });
     }
 }
