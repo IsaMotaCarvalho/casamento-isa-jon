@@ -11,7 +11,7 @@ import QuotaOrders from '../../components/admin/QuotaOrders';
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<'dash' | 'guests' | 'gifts' | 'orders'>('dash');
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [guests, setGuests] = useState<any[]>([]);
+    const [guests, setGuests] = useState<any[]>([]); // Armazena os grupos familiares
     const [gifts, setGifts] = useState<any[]>([]);
     const [orders, setOrders] = useState<any[]>([]);
 
@@ -37,7 +37,7 @@ export default function AdminDashboard() {
         }
     };
 
-    const handleAddGuest = async (guestForm: { name: string; phone: string; side: string }) => {
+    const handleAddGuest = async (guestForm: { name: string; phone: string; side: string; members: { name: string; confirmed: boolean }[] }) => {
         await fetch('/api/guests', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -55,16 +55,23 @@ export default function AdminDashboard() {
         fetchData();
     };
 
-    const toggleConfirmGuest = async (id: string, currentStatus: boolean) => {
+    const toggleConfirmMember = async (guestId: string, memberId: string, currentStatus: boolean) => {
+        const targetFamily = guests.find(g => g._id === guestId);
+        if (!targetFamily) return;
+
+        const updatedMembers = targetFamily.members.map((m: any) =>
+            m._id === memberId ? { ...m, confirmed: !currentStatus } : m
+        );
+
         await fetch('/api/guests', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id, confirmed: !currentStatus }),
+            body: JSON.stringify({ id: guestId, members: updatedMembers }),
         });
         fetchData();
     };
 
-    const handleUpdateGuest = async (id: string, updatedForm: { name: string; phone: string; side: string; confirmed: boolean }) => {
+    const handleUpdateGuest = async (id: string, updatedForm: { name: string; phone: string; side: string; members: { name: string; confirmed: boolean }[] }) => {
         await fetch('/api/guests', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -112,9 +119,17 @@ export default function AdminDashboard() {
 
     const totalQuotasMarked = gifts.reduce((acc, curr) => acc + (curr.claimedQuotas || 0), 0);
 
+    // Adaptação dos convidados para manter compatibilidade com contadores do Dashboard Overview
+    const flattenedGuestsForDash = guests.flatMap(g =>
+        (g.members || []).map((m: any) => ({
+            ...m,
+            side: g.side,
+            phone: g.phone
+        }))
+    );
+
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-            {/* Topbar do Mobile (Apenas visível em telas menores que md) */}
             <header className="bg-slate-900 text-white p-4 flex items-center justify-between md:hidden shadow-md z-30">
                 <h2 className="text-lg font-bold tracking-wider text-amber-400">💍 Noivos CRM</h2>
                 <button
@@ -125,7 +140,6 @@ export default function AdminDashboard() {
                 </button>
             </header>
 
-            {/* Menu Lateral Injetado com os Estados do Drawer */}
             <Sidebar
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -133,11 +147,10 @@ export default function AdminDashboard() {
                 setIsOpen={setIsSidebarOpen}
             />
 
-            {/* Conteúdo Principal com Padding Reativo */}
             <main className="flex-1 p-4 sm:p-6 md:p-10 overflow-y-auto">
                 {activeTab === 'dash' && (
                     <DashboardOverview
-                        guests={guests}
+                        guests={flattenedGuestsForDash}
                         gifts={gifts}
                         orders={orders}
                         totalQuotasMarked={totalQuotasMarked}
@@ -149,7 +162,7 @@ export default function AdminDashboard() {
                         guests={guests}
                         orders={orders}
                         onAddGuest={handleAddGuest}
-                        onToggleConfirm={toggleConfirmGuest}
+                        onToggleConfirm={toggleConfirmMember}
                         onDeleteItem={deleteItem}
                         onUpdateGuest={handleUpdateGuest}
                         onUpdateOrder={handleUpdateOrder}

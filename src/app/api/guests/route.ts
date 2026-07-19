@@ -9,12 +9,21 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
+    const phone = searchParams.get('phone');
 
     try {
         if (id) {
             const guest = await Guest.findById(id);
             if (!guest) {
-                return NextResponse.json({ error: 'Convidado não encontrado' }, { status: 404 });
+                return NextResponse.json({ error: 'Família não encontrada' }, { status: 404 });
+            }
+            return NextResponse.json(guest);
+        }
+
+        if (phone) {
+            const guest = await Guest.findOne({ phone });
+            if (!guest) {
+                return NextResponse.json({ error: 'Família não encontrada para este telefone' }, { status: 404 });
             }
             return NextResponse.json(guest);
         }
@@ -28,14 +37,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     await dbConnect();
-    const data = await request.json();
-    const { id, ...updateData } = data;
-
     try {
+        const data = await request.json();
+        const { id, ...updateData } = data;
+
         if (id) {
             const guest = await Guest.findByIdAndUpdate(id, updateData, { new: true });
             if (!guest) {
-                return NextResponse.json({ error: 'Convidado não encontrado para atualização' }, { status: 404 });
+                return NextResponse.json({ error: 'Família não encontrada para atualização' }, { status: 404 });
             }
             return NextResponse.json(guest);
         }
@@ -54,11 +63,11 @@ export async function PUT(request: Request) {
         const { id, ...updateData } = data;
         const guest = await Guest.findByIdAndUpdate(id, updateData, { new: true });
         if (!guest) {
-            return NextResponse.json({ error: 'Convidado não encontrado' }, { status: 404 });
+            return NextResponse.json({ error: 'Família não encontrada' }, { status: 404 });
         }
         return NextResponse.json(guest);
     } catch (error) {
-        return NextResponse.json({ error: 'Erro ao atualizar convidado' }, { status: 400 });
+        return NextResponse.json({ error: 'Erro ao atualizar grupo familiar' }, { status: 400 });
     }
 }
 
@@ -70,10 +79,10 @@ export async function DELETE(request: Request) {
     try {
         const guest = await Guest.findById(id);
         if (!guest) {
-            return NextResponse.json({ error: 'Convidado não encontrado' }, { status: 404 });
+            return NextResponse.json({ error: 'Família não encontrada' }, { status: 404 });
         }
 
-        // 1. Busca todos os pedidos associados ao telefone deste convidado
+        // 1. Busca todos os pedidos associados ao telefone deste grupo familiar
         const guestOrders = await Order.find({ guestPhone: guest.phone });
 
         // 2. Desfaz as operações de quantidades e limpa os históricos em todas as tabelas
@@ -84,12 +93,12 @@ export async function DELETE(request: Request) {
             });
         }
 
-        // 3. Remove os pedidos e o convidado definitivamente
+        // 3. Remove os pedidos e a família definitivamente
         await Order.deleteMany({ guestPhone: guest.phone });
         await Guest.findByIdAndDelete(id);
 
-        return NextResponse.json({ message: 'Convidado e todas as suas cotas correspondentes foram removidos com sucesso!' });
+        return NextResponse.json({ message: 'Família e todas as suas cotas correspondentes foram removidas com sucesso!' });
     } catch (error) {
-        return NextResponse.json({ error: 'Erro ao processar a remoção em cascata do convidado' }, { status: 400 });
+        return NextResponse.json({ error: 'Erro ao processar a remoção em cascata da família' }, { status: 400 });
     }
 }
